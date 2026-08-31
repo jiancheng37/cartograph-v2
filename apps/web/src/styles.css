@@ -219,8 +219,36 @@ input {
 }
 .topbar h1 {
   font-size: 17px;
-  margin: 5px 0 0;
+  margin: 0;
   letter-spacing: -0.025em;
+}
+.map-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 5px;
+}
+.map-level {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: #737a74;
+  font: 8px ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
+.map-level b {
+  color: #a7b97a;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.map-level i {
+  width: 2px;
+  height: 2px;
+  margin: 0 2px;
+  border-radius: 50%;
+  background: #4d534e;
 }
 .freshness {
   display: flex;

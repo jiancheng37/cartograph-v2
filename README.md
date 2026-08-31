@@ -7,7 +7,7 @@ Cartograph turns investigations from Codex, Claude Code, and other MCP clients i
 - Lightweight repository registration: hosted Cartograph stores a logical repository identity, never repository contents.
 - Semantic views containing components, execution steps, typed relationships, confidence levels, and agent-supplied source references.
 - Optimistic revision control so two agents cannot silently overwrite the same view.
-- MCP tools for discovering prior knowledge, creating views, extending views, drill-downs, and traces.
+- MCP tools for discovering prior knowledge, creating level-specific architecture views, extending views, drill-downs, and traces.
 - Interactive React Flow canvas with progressive disclosure, source inspection, confidence styling, and live view refresh.
 - Google authentication, tenant-scoped PostgreSQL persistence, revocable MCP credentials, and a remote Streamable HTTP MCP endpoint.
 - Local development runs against the same Supabase authentication, PostgreSQL storage, and HTTP MCP boundary used in production.

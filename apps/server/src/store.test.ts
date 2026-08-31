@@ -55,7 +55,7 @@ describe("Cartograph knowledge lifecycle", () => {
   it("creates, extends, searches, and manages agent-authored views", async () => {
     const { root, app } = workspace("views"); const repository = await register(app, root);
     const created = (await request(app).post("/api/views").send({ repositoryId: repository.id, title: "Authentication flow", description: "Sign-in path", nodes: [{ id: "auth", label: "Authenticate", kind: "function", summary: "Validates a user", confidence: "source_cited", evidence: [{ path: "src/auth.ts", startLine: 1 }] }], edges: [] }).expect(201)).body;
-    expect(created).toMatchObject({ revision: 1, ancestors: [], nodes: [{ id: "auth", confidence: "source_cited" }] });
+    expect(created).toMatchObject({ revision: 1, viewType: "custom", scope: "", ancestors: [], nodes: [{ id: "auth", confidence: "source_cited" }] });
     const extended = (await request(app).post(`/api/views/${created.id}/extend`).send({ expectedRevision: 1, nodes: [{ id: "token", label: "Issue token", kind: "function", summary: "Creates a session", evidence: [] }], edges: [{ source: "auth", target: "token", kind: "calls", evidence: [] }] }).expect(200)).body;
     expect(extended.revision).toBe(2); expect(extended.nodes).toHaveLength(2); expect(extended.edges).toHaveLength(1);
     const search = (await request(app).get(`/api/repositories/${repository.id}/search?q=auth`).expect(200)).body;
@@ -71,10 +71,18 @@ describe("Cartograph knowledge lifecycle", () => {
     const { root, app } = workspace("drilldown"); const repository = await register(app, root);
     const parent = (await request(app).post("/api/views").send({ repositoryId: repository.id, title: "System", nodes: [{ id: "api", label: "API", kind: "service", summary: "Handles requests", evidence: [] }], edges: [] }).expect(201)).body;
     const child = (await request(app).post(`/api/views/${parent.id}/nodes/api/drilldown`).expect(201)).body;
-    expect(child).toMatchObject({ parentViewId: parent.id, parentNodeId: "api", title: "API" });
+    expect(child).toMatchObject({ parentViewId: parent.id, parentNodeId: "api", title: "API", viewType: "component", scope: "API" });
     expect(child.ancestors).toEqual([{ viewId: parent.id, title: "System", nodeId: "api", nodeLabel: "API" }]);
-    expect(child.nodes).toHaveLength(1);
+    expect(child.nodes).toHaveLength(0);
     expect((await request(app).post(`/api/views/${parent.id}/nodes/api/drilldown`).expect(201)).body.id).toBe(child.id);
+  });
+
+  it("keeps typed views at one abstraction level", async () => {
+    const { root, app } = workspace("view-types"); const repository = await register(app, root);
+    const system = (await request(app).post("/api/views").send({ repositoryId: repository.id, title: "CRM runtime", viewType: "system", scope: "CRM product", nodes: [{ id: "api", label: "API service", kind: "service", summary: "Serves requests", evidence: [] }], edges: [] }).expect(201)).body;
+    expect(system).toMatchObject({ viewType: "system", scope: "CRM product" });
+    const invalid = await request(app).post(`/api/views/${system.id}/extend`).send({ nodes: [{ id: "handler", label: "Webhook handler", kind: "function", summary: "Handles a webhook", evidence: [] }], edges: [] }).expect(400);
+    expect(invalid.body.error).toContain("does not belong in a system view");
   });
 
   it("persists traces and redacts secret-shaped payload fields", async () => {

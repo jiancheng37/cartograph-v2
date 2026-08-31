@@ -14,6 +14,8 @@ create table if not exists public.views (
   repository_id text not null,
   title text not null,
   description text not null default '',
+  view_type text not null default 'custom' check (view_type in ('landscape', 'system', 'component', 'code', 'custom')),
+  scope text not null default '',
   graph jsonb not null default '{"nodes":[],"edges":[]}'::jsonb,
   parent_view_id text,
   parent_node_id text,

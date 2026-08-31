@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import type { CartographDb } from "./db.js";
-import type { CreateTraceInput, CreateViewInput, Evidence, KnowledgeSearchResult, KnowledgeTrace, KnowledgeView, McpToken, Repository, TraceStep, ViewEdgeInput, ViewNodeInput } from "@cartograph/shared";
+import { childViewType, viewNodeKindErrors, type CreateTraceInput, type CreateViewInput, type Evidence, type KnowledgeSearchResult, type KnowledgeTrace, type KnowledgeView, type McpToken, type Repository, type TraceStep, type ViewEdgeInput, type ViewNodeInput } from "@cartograph/shared";
 import { validateTrace } from "./trace-validation.js";
 
 type Row = Record<string, unknown>;
@@ -63,7 +63,7 @@ export class Store {
     const children = this.db.prepare("SELECT id,parent_node_id FROM views WHERE parent_view_id=? AND archived_at IS NULL").all(id) as Row[];
     const childByNode = new Map(children.map(child => [String(child.parent_node_id), String(child.id)]));
     return {
-      id: String(row.id), repositoryId: String(row.repository_id), title: String(row.title), description: String(row.description),
+      id: String(row.id), repositoryId: String(row.repository_id), title: String(row.title), description: String(row.description), viewType: String(row.view_type ?? "custom") as KnowledgeView["viewType"], scope: String(row.scope ?? ""),
       parentViewId: row.parent_view_id ? String(row.parent_view_id) : undefined, parentNodeId: row.parent_node_id ? String(row.parent_node_id) : undefined,
       ancestors: this.viewAncestors(id),
       createdAt: String(row.created_at), updatedAt: String(row.updated_at), revision: Number(row.revision), archivedAt: row.archived_at ? String(row.archived_at) : undefined,
@@ -79,7 +79,7 @@ export class Store {
       if (parent.repositoryId !== input.repositoryId) throw new Error("Child view must belong to the same repository");
       if (!parent.nodes.some(node => node.id === input.parentNodeId)) throw new Error("Parent node not found");
     }
-    this.db.prepare("INSERT INTO views(id,repository_id,title,description,created_at,updated_at,revision,archived_at,parent_view_id,parent_node_id) VALUES(?,?,?,?,?,?,?,NULL,?,?)").run(id, input.repositoryId, input.title, input.description, timestamp, timestamp, 1, input.parentViewId ?? null, input.parentNodeId ?? null);
+    this.db.prepare("INSERT INTO views(id,repository_id,title,description,created_at,updated_at,revision,archived_at,parent_view_id,parent_node_id,view_type,scope) VALUES(?,?,?,?,?,?,?,NULL,?,?,?,?)").run(id, input.repositoryId, input.title, input.description, timestamp, timestamp, 1, input.parentViewId ?? null, input.parentNodeId ?? null, input.viewType, input.scope);
     this.addGraph(id, input.nodes, input.edges);
     return this.view(id)!;
   }
@@ -87,6 +87,7 @@ export class Store {
   extendView(id: string, nodes: ViewNodeInput[], edges: ViewEdgeInput[], expectedRevision?: number): KnowledgeView {
     const current = this.view(id); if (!current) throw new Error("View not found");
     if (expectedRevision && current.revision !== expectedRevision) throw new Error(`Revision conflict: expected ${expectedRevision}, found ${current.revision}`);
+    const semanticErrors = viewNodeKindErrors(current.viewType, nodes); if (semanticErrors.length) throw new Error(semanticErrors.join("\n"));
     this.addGraph(id, nodes, edges);
     this.db.prepare("UPDATE views SET updated_at=?,revision=revision+1 WHERE id=?").run(now(), id);
     return this.view(id)!;
@@ -116,14 +117,14 @@ export class Store {
 
   duplicateView(id: string): KnowledgeView {
     const current = this.view(id); if (!current) throw new Error("View not found");
-    return this.createView({ repositoryId: current.repositoryId, title: `${current.title} copy`, description: current.description, nodes: current.nodes, edges: current.edges });
+    return this.createView({ repositoryId: current.repositoryId, title: `${current.title} copy`, description: current.description, viewType: current.viewType, scope: current.scope, nodes: current.nodes, edges: current.edges });
   }
 
   createNodeDrilldown(viewId: string, nodeId: string): KnowledgeView {
     const parent = this.view(viewId); if (!parent) throw new Error("View not found");
     const node = parent.nodes.find(item => item.id === nodeId); if (!node) throw new Error("Node not found");
     if (node.childViewId) return this.view(node.childViewId)!;
-    return this.createView({ repositoryId: parent.repositoryId, parentViewId: viewId, parentNodeId: nodeId, title: node.label, description: `Inside ${node.label}`, nodes: [{ ...node, id: `focus:${node.id}`, label: node.label, summary: node.summary, position: { x: 120, y: 120 } }], edges: [] });
+    return this.createView({ repositoryId: parent.repositoryId, parentViewId: viewId, parentNodeId: nodeId, title: node.label, description: `Inside ${node.label}`, viewType: childViewType(parent.viewType, node.kind), scope: node.label, nodes: [], edges: [] });
   }
 
   traces(viewId: string): KnowledgeTrace[] {

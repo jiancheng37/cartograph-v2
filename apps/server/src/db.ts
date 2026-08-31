@@ -15,7 +15,8 @@ export function openDatabase(path = process.env.CARTOGRAPH_DB ?? resolve(".carto
       id TEXT PRIMARY KEY, repository_id TEXT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
       title TEXT NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, archived_at TEXT,
-      parent_view_id TEXT REFERENCES views(id) ON DELETE CASCADE, parent_node_id TEXT
+      parent_view_id TEXT REFERENCES views(id) ON DELETE CASCADE, parent_node_id TEXT,
+      view_type TEXT NOT NULL DEFAULT 'custom', scope TEXT NOT NULL DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS view_nodes (
       id TEXT NOT NULL, view_id TEXT NOT NULL REFERENCES views(id) ON DELETE CASCADE,
@@ -49,10 +50,17 @@ export function openDatabase(path = process.env.CARTOGRAPH_DB ?? resolve(".carto
   ensureRepositoryOwnerColumn(db);
   ensureViewArchiveColumn(db);
   ensureViewHierarchyColumns(db);
+  ensureViewSemanticsColumns(db);
   ensureEdgeRouteColumn(db);
   migrateViewGraphKeys(db);
   removeLegacyIndexData(db);
   return db;
+}
+
+function ensureViewSemanticsColumns(db: DatabaseSync) {
+  const columns = db.prepare("PRAGMA table_info(views)").all() as unknown as TableColumn[];
+  if (!columns.some(column => column.name === "view_type")) db.exec("ALTER TABLE views ADD COLUMN view_type TEXT NOT NULL DEFAULT 'custom'");
+  if (!columns.some(column => column.name === "scope")) db.exec("ALTER TABLE views ADD COLUMN scope TEXT NOT NULL DEFAULT ''");
 }
 
 function ensureRepositoryOwnerColumn(db: DatabaseSync) {

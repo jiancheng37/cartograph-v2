@@ -3,6 +3,7 @@ import { z } from "zod";
 export const NodeKind = z.enum(["system", "service", "module", "route", "function", "class", "database", "external", "queue", "concept"]);
 export const EdgeKind = z.enum(["calls", "imports", "reads", "writes", "publishes", "consumes", "contains", "depends_on", "transforms", "returns"]);
 export const Confidence = z.enum(["source_cited", "inferred", "user_confirmed"]);
+export const ViewType = z.enum(["landscape", "system", "component", "code", "custom"]);
 
 export const EvidenceSchema = z.object({
   path: z.string().min(1),
@@ -39,12 +40,18 @@ export const EdgeRouteSchema = z.object({
 export const CreateViewSchema = z.object({
   title: z.string().min(2).max(120),
   description: z.string().max(600).default(""),
+  viewType: ViewType.default("custom"),
+  scope: z.string().max(160).default(""),
   repositoryId: z.string().min(1),
   parentViewId: z.string().min(1).optional(),
   parentNodeId: z.string().min(1).optional(),
   nodes: z.array(ViewNodeInputSchema).max(80).default([]),
   edges: z.array(ViewEdgeInputSchema).max(160).default([]),
-}).refine(input => Boolean(input.parentViewId) === Boolean(input.parentNodeId), { message: "parentViewId and parentNodeId must be provided together" });
+}).refine(input => Boolean(input.parentViewId) === Boolean(input.parentNodeId), { message: "parentViewId and parentNodeId must be provided together" })
+  .superRefine((input, context) => {
+    const errors = viewNodeKindErrors(input.viewType, input.nodes);
+    for (const error of errors) context.addIssue({ code: "custom", message: error, path: ["nodes"] });
+  });
 
 export const PatchViewSchema = z.object({
   title: z.string().min(2).max(120).optional(),
@@ -114,6 +121,32 @@ export type ViewEdgeInput = z.infer<typeof ViewEdgeInputSchema>;
 export type CreateViewInput = z.infer<typeof CreateViewSchema>;
 export type CreateTraceInput = z.infer<typeof CreateTraceSchema>;
 export type TraceStepInput = z.infer<typeof TraceStepSchema>;
+export type ViewTypeValue = z.infer<typeof ViewType>;
+
+const viewNodeKinds: Record<ViewTypeValue, Set<z.infer<typeof NodeKind>>> = {
+  landscape: new Set(["system", "external", "concept"]),
+  system: new Set(["service", "database", "external", "queue"]),
+  component: new Set(["service", "module", "route", "database", "external", "queue"]),
+  code: new Set(["module", "route", "function", "class"]),
+  custom: new Set(NodeKind.options),
+};
+
+export function viewNodeKindErrors(viewType: ViewTypeValue, nodes: Pick<ViewNodeInput, "label" | "kind">[]): string[] {
+  const allowed = viewNodeKinds[viewType];
+  return nodes.flatMap(node => allowed.has(node.kind) ? [] : [`${JSON.stringify(node.label)} is a ${node.kind}, which does not belong in a ${viewType} view. Allowed kinds: ${[...allowed].join(", ")}`]);
+}
+
+export function childViewType(parentType: ViewTypeValue, nodeKind: z.infer<typeof NodeKind>): ViewTypeValue {
+  if (parentType === "landscape") return "system";
+  if (parentType === "system") return "component";
+  if (parentType === "component") return "code";
+  if (parentType === "custom") {
+    if (nodeKind === "system") return "system";
+    if (["service", "module"].includes(nodeKind)) return "component";
+    if (["route", "function", "class"].includes(nodeKind)) return "code";
+  }
+  return "custom";
+}
 
 type TracePayload = NonNullable<TraceStepInput["payload"]>;
 type TracePayloadField = TracePayload["fields"][number];
@@ -174,6 +207,6 @@ export interface KnowledgeSearchResult { id: string; type: "view" | "node"; labe
 export interface ViewNode extends ViewNodeInput { id: string; position: { x: number; y: number }; childViewId?: string; }
 export interface ViewEdge extends ViewEdgeInput { id: string; route?: z.infer<typeof EdgeRouteSchema>; }
 export interface ViewAncestor { viewId: string; title: string; nodeId: string; nodeLabel: string; }
-export interface KnowledgeView { id: string; title: string; description: string; repositoryId: string; parentViewId?: string; parentNodeId?: string; ancestors: ViewAncestor[]; createdAt: string; updatedAt: string; revision: number; archivedAt?: string; nodes: ViewNode[]; edges: ViewEdge[]; }
+export interface KnowledgeView { id: string; title: string; description: string; viewType: ViewTypeValue; scope: string; repositoryId: string; parentViewId?: string; parentNodeId?: string; ancestors: ViewAncestor[]; createdAt: string; updatedAt: string; revision: number; archivedAt?: string; nodes: ViewNode[]; edges: ViewEdge[]; }
 export interface TraceStep extends TraceStepInput { id: string; }
 export interface KnowledgeTrace { id: string; viewId: string; title: string; description: string; createdAt: string; updatedAt: string; steps: TraceStep[]; }

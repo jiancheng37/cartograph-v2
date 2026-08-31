@@ -8,7 +8,7 @@ Cartograph uses three deployable surfaces:
 
 ## 1. Create Supabase
 
-Create a Supabase project and run [`supabase/migrations/202608310001_initial.sql`](supabase/migrations/202608310001_initial.sql) in its SQL editor (or with `supabase db push`). In Authentication → Providers, enable Google and supply the Google OAuth client credentials.
+Create a Supabase project and apply every SQL file in [`supabase/migrations`](supabase/migrations) in timestamp order (or use `supabase db push`). In Authentication → Providers, enable Google and supply the Google OAuth client credentials.
 
 Add these redirect URLs in Supabase Authentication → URL Configuration:
 
