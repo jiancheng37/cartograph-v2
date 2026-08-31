@@ -1781,6 +1781,7 @@ input {
 }
 .trace-rail {
   min-height: 236px;
+  max-height: calc(100% - 32px);
   grid-template-rows: 58px minmax(110px, 1fr) 46px;
 }
 .trace-rail > header {
@@ -1869,6 +1870,8 @@ input {
 .trace-story {
   grid-column: 2;
   grid-row: 2;
+  min-height: 0;
+  overflow: hidden;
 }
 .trace-rail > footer {
   grid-row: 3;
@@ -1914,7 +1917,7 @@ input {
   }
 }
 .trace-rail.has-payload {
-  height: min(430px, calc(100% - 36px));
+  height: min(440px, calc(100% - 32px));
 }
 .trace-story.with-payload {
   grid-template-columns: 180px minmax(0, 1fr);
@@ -1924,7 +1927,7 @@ input {
 .data-lens {
   min-width: 0;
   display: grid;
-  grid-template-rows: 20px minmax(80px, 1fr) minmax(72px, 0.8fr);
+  grid-template-rows: 20px minmax(112px, 1fr) auto;
   gap: 8px;
   overflow: hidden;
 }
@@ -2007,6 +2010,8 @@ input {
   min-height: 0;
   border-top: 1px solid #292e2a;
   padding-top: 8px;
+  max-height: 116px;
+  overflow: hidden;
 }
 .field-changes nav {
   display: flex;
@@ -2068,6 +2073,7 @@ input {
   min-width: 0;
   border-left: 1px solid #292e2a;
   padding-left: 12px;
+  overflow: auto;
 }
 .field-changes aside b {
   font:
@@ -2239,7 +2245,7 @@ input {
   min-height: 300px;
 }
 .trace-rail.has-boundary.has-payload {
-  height: min(520px, calc(100% - 36px));
+  height: min(480px, calc(100% - 32px));
 }
 .boundary-flow {
   display: grid;
@@ -2378,5 +2384,17 @@ input {
   }
   .trace-step-detail {
     overflow: visible;
+  }
+}
+@media (min-width: 901px) and (max-height: 700px) {
+  .trace-rail.has-payload,
+  .trace-rail.has-boundary.has-payload {
+    height: min(430px, calc(100% - 24px));
+  }
+  .trace-story.with-payload {
+    padding-block: 10px;
+  }
+  .boundary-flow {
+    max-height: 66px;
   }
 }

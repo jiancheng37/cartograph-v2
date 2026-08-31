@@ -5,6 +5,10 @@ const architecture = { id: "view_arch", repositoryId: repository.id, title: "Rep
   { id: "source", label: "Source repository", kind: "external", summary: "Supplies source files to the coding agent.", confidence: "source_cited", evidence: [{ path: "src/repository.ts", startLine: 12, endLine: 30 }], position: { x: 120, y: 100 } },
   { id: "store", label: "Semantic store", kind: "class", summary: "Persists agent-authored knowledge views.", confidence: "source_cited", evidence: [{ path: "src/store.ts", startLine: 9 }], position: { x: 400, y: 100 } },
 ], edges: [{ id: "writes", source: "source", target: "store", kind: "writes", label: "saved maps", confidence: "source_cited", evidence: [] }] };
+const payloadTrace = { id: "trace_payload", viewId: architecture.id, title: "Webhook to store", description: "Payload journey", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), steps: [
+  { id: "receive", nodeId: "source", edgeId: "writes", label: "Receive webhook", action: "Receive a representative webhook payload.", input: "", output: "", evidence: [{ path: "src/webhook.ts", startLine: 18 }], payload: { format: "json", before: { name: "Aisha Tan", phone: "+6591234567", other_fields: { Budget: "SGD 1.5M" } }, after: { name: "Aisha Tan", phone: "+6591234567", other_fields: { Budget: "SGD 1.5M" } }, fields: [{ path: "name", operation: "passed_through", explanation: "Required lead name.", before: "Aisha Tan", after: "Aisha Tan", evidence: [] }, { path: "phone", operation: "passed_through", explanation: "Contact number.", before: "+6591234567", after: "+6591234567", evidence: [] }] } },
+  { id: "store", nodeId: "store", label: "Store payload", action: "Persist the normalized record.", input: "Normalized lead", output: "Stored record", evidence: [] },
+] };
 
 async function mockApi(page: Page) {
   let views: any[] = [structuredClone(architecture)];
@@ -16,7 +20,7 @@ async function mockApi(page: Page) {
     if (path === "/api/setup" && method === "GET") return json({ projectRoot: "/code/cartograph" });
     if (path.endsWith("/search")) return json([{ id: "node:view_arch:store", type: "node", label: "Semantic store", detail: "Repository architecture · class", viewId: "view_arch", nodeId: "store" }]);
     if (path === "/api/views" && method === "GET") return json(views.filter(view => !view.archivedAt));
-    if (path.endsWith("/traces") && method === "GET") return json([]);
+    if (path.endsWith("/traces") && method === "GET") return json([payloadTrace]);
     if (path === "/api/views" && method === "POST") { const input = request.postDataJSON(); const created = { ...architecture, id: `view_${views.length}`, title: input.title, description: input.description, nodes: [], edges: [], revision: 1 }; views.unshift(created); return json(created, 201); }
     const id = path.split("/")[3]; const index = views.findIndex(view => view.id === id); const current = views[index];
     if (path.endsWith("/positions") && method === "PATCH") { const input = request.postDataJSON(); current.nodes = current.nodes.map((node: any) => ({ ...node, position: input.positions.find((item: any) => item.id === node.id) ?? node.position })); current.revision += 1; return json(current); }
@@ -85,4 +89,21 @@ test("presents the public product and routes into the app", async ({ page }, tes
   await expect(page.getByRole("heading", { name: "Stop explaining your codebase from scratch." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Cartograph stores understanding, not your repository." })).toBeVisible();
   await expect(page.getByRole("link", { name: /Start with Google/ })).toHaveAttribute("href", /\/app$/);
+});
+
+test("keeps payload traces inside a wide, short workspace", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop");
+  await page.setViewportSize({ width: 2048, height: 640 });
+  await page.getByLabel("Trace mode").selectOption(payloadTrace.id);
+  const rail = page.locator(".trace-rail");
+  await expect(rail).toBeVisible();
+  const bounds = await page.evaluate(() => {
+    const box = (selector: string) => { const rect = document.querySelector(selector)!.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, height: rect.height }; };
+    return { canvas: box(".canvas-wrap"), rail: box(".trace-rail"), footer: box(".trace-rail > footer"), lens: box(".data-lens"), fields: box(".field-changes") };
+  });
+  expect(bounds.rail.top).toBeGreaterThanOrEqual(bounds.canvas.top);
+  expect(bounds.rail.bottom).toBeLessThanOrEqual(bounds.canvas.bottom);
+  expect(bounds.footer.bottom).toBeLessThanOrEqual(bounds.rail.bottom);
+  expect(bounds.fields.bottom).toBeLessThanOrEqual(bounds.footer.top);
+  expect(bounds.lens.height).toBeGreaterThan(190);
 });
