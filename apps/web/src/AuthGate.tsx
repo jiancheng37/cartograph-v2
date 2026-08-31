@@ -13,9 +13,9 @@ export function AuthGate() {
     const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => data.subscription.unsubscribe();
   }, []);
-  if (!authConfigured) return import.meta.env.PROD
-    ? <main className="auth-loading"><Map/><span>Authentication is not configured.</span></main>
-    : <App />;
+  if (!authConfigured) return import.meta.env.DEV && import.meta.env.VITE_TEST_AUTH_BYPASS === "true"
+    ? <App />
+    : <main className="auth-loading"><Map/><span>Authentication is not configured. Start with npm run dev.</span></main>;
   if (session === undefined) return <div className="auth-loading"><LoaderCircle className="spin"/><span>Opening Cartograph</span></div>;
   if (session) return <App user={{ name: session.user.user_metadata.full_name ?? session.user.email ?? "Account", email: session.user.email ?? "" }} />;
   return <main className="login-page"><a className="public-brand" href="/"><Map size={18}/><b>Cartograph</b></a><section><span>Welcome back</span><h1>Your codebase, remembered.</h1><p>Sign in to open your maps and connect a coding agent.</p><button onClick={() => void signInWithGoogle().catch(cause => setError(cause instanceof Error ? cause.message : "Could not sign in"))}><GoogleMark/>Continue with Google</button>{error && <small>{error}</small>}</section><footer>By continuing, you agree to the Terms and Privacy Policy.</footer></main>;

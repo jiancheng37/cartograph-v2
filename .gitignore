@@ -9,5 +9,8 @@ test-results
 playwright-report
 tmp
 *.tsbuildinfo
+.env
+.env.*
+!.env.example
 apps/web/vite.config.js
 apps/web/vite.config.d.ts

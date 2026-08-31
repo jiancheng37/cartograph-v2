@@ -9,5 +9,5 @@ export default defineConfig({
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 1000 } } },
     { name: "mobile", use: { ...devices["iPhone 13"], browserName: "chromium" } },
   ],
-  webServer: { command: "npm run dev -w @cartograph/web -- --host 127.0.0.1 --port 4173 --strictPort", url: "http://127.0.0.1:4173", reuseExistingServer: true },
+  webServer: { command: "VITE_TEST_AUTH_BYPASS=true npm run dev -w @cartograph/web -- --host 127.0.0.1 --port 4173 --strictPort", url: "http://127.0.0.1:4173", reuseExistingServer: true },
 });

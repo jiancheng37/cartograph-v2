@@ -6,7 +6,6 @@
     "dev": "tsx watch src/http.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/http.js",
-    "mcp": "tsx src/mcp.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

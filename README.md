@@ -10,7 +10,7 @@ Cartograph turns investigations from Codex, Claude Code, and other MCP clients i
 - MCP tools for discovering prior knowledge, creating views, extending views, drill-downs, and traces.
 - Interactive React Flow canvas with progressive disclosure, source inspection, confidence styling, and live view refresh.
 - Google authentication, tenant-scoped PostgreSQL persistence, revocable MCP credentials, and a remote Streamable HTTP MCP endpoint.
-- Local SQLite and stdio MCP remain available for development.
+- Local development runs against the same Supabase authentication, PostgreSQL storage, and HTTP MCP boundary used in production.
 
 ## Run locally
 
@@ -21,25 +21,11 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173), enter an absolute repository path, and add it as a workspace. Cartograph does not scan the repository. Local data is stored in `.cartograph/cartograph.db`.
-
-The development server intentionally permits a local user when Supabase variables are absent. Production refuses to start without its required cloud configuration. Copy [`.env.example`](.env.example) for the complete variable list.
+Open [http://localhost:5173](http://localhost:5173) and sign in with Google. The development command loads the linked Supabase project and database password from macOS Keychain, so local behavior uses real sessions, tenant isolation, PostgreSQL, and remote MCP tokens. It fails closed when authentication or database configuration is unavailable.
 
 ## Connect an MCP client
 
-Configure the client to launch Cartograph over stdio. Use the absolute path to this checkout:
-
-```json
-{
-  "mcpServers": {
-    "cartograph": {
-      "command": "npm",
-      "args": ["run", "start:mcp"],
-      "cwd": "/absolute/path/to/cartograph"
-    }
-  }
-}
-```
+Sign in, create a workspace, then open **Connect Cartograph**. Generate a revocable token and run the displayed HTTP MCP command for Codex or Claude Code.
 
 Then ask the agent:
 
@@ -57,7 +43,7 @@ The MCP server exposes:
 - `create_trace`
 - `list_traces`
 
-In hosted mode, sign in at the app, open **Connect Cartograph**, and generate a revocable token. The app displays the exact remote MCP command. The token is shown once; Cartograph stores only its SHA-256 hash.
+The token is shown once; Cartograph stores only its SHA-256 hash. Local development uses `http://localhost:4310/mcp`; deployed environments use the configured API URL.
 
 ## Architecture
 
