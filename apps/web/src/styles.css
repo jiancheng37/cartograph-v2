@@ -1965,6 +1965,7 @@ input {
   align-items: center;
   gap: 8px;
   min-height: 0;
+  overflow: hidden;
 }
 .payload-diff > svg {
   color: #59605a;
@@ -1974,6 +1975,7 @@ input {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .payload-diff small {
   color: #737b74;
@@ -1988,6 +1990,7 @@ input {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  max-height: 100%;
   margin: 5px 0 0;
   padding: 8px 10px;
   background: #101210;

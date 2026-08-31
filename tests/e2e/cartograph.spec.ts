@@ -6,7 +6,7 @@ const architecture = { id: "view_arch", repositoryId: repository.id, title: "Rep
   { id: "store", label: "Semantic store", kind: "class", summary: "Persists agent-authored knowledge views.", confidence: "source_cited", evidence: [{ path: "src/store.ts", startLine: 9 }], position: { x: 400, y: 100 } },
 ], edges: [{ id: "writes", source: "source", target: "store", kind: "writes", label: "saved maps", confidence: "source_cited", evidence: [] }] };
 const payloadTrace = { id: "trace_payload", viewId: architecture.id, title: "Webhook to store", description: "Payload journey", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), steps: [
-  { id: "receive", nodeId: "source", edgeId: "writes", label: "Receive webhook", action: "Receive a representative webhook payload.", input: "", output: "", evidence: [{ path: "src/webhook.ts", startLine: 18 }], payload: { format: "json", before: { name: "Aisha Tan", phone: "+6591234567", other_fields: { Budget: "SGD 1.5M" } }, after: { name: "Aisha Tan", phone: "+6591234567", budget: 1500000 }, fields: [{ path: "budget", operation: "modified", explanation: "Normalize the budget to a number.", before: "SGD 1.5M", after: 1500000, evidence: [] }] } },
+  { id: "receive", nodeId: "source", edgeId: "writes", label: "Receive webhook", action: "Receive a representative webhook payload.", input: "", output: "", evidence: [{ path: "src/webhook.ts", startLine: 18 }], payload: { format: "json", before: { id: null, status: null, meta_data: null }, after: { id: 9001, source: "webhook-cf", status: "NOT_YET_PROCESSED", meta_data: { luid: "demo-luid-aisha-001", name: "Aisha Tan", email: "aisha.tan@example.invalid", phone: "+6591234567", lead_source: "August Condo Campaign", other_fields: { Budget: "SGD 1.5M", Preferred_Area: "East Coast" } } }, fields: [{ path: "id", operation: "added", explanation: "Synthetic database ID for this example.", before: null, after: 9001, evidence: [] }] } },
   { id: "store", nodeId: "store", label: "Store payload", action: "Persist the normalized record.", input: "Normalized lead", output: "Stored record", evidence: [] },
 ] };
 
@@ -99,11 +99,13 @@ test("keeps payload traces inside a wide, short workspace", async ({ page }, tes
   await expect(rail).toBeVisible();
   const bounds = await page.evaluate(() => {
     const box = (selector: string) => { const rect = document.querySelector(selector)!.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, height: rect.height }; };
-    return { canvas: box(".canvas-wrap"), rail: box(".trace-rail"), footer: box(".trace-rail > footer"), lens: box(".data-lens"), fields: box(".field-changes") };
+    return { canvas: box(".canvas-wrap"), rail: box(".trace-rail"), footer: box(".trace-rail > footer"), lens: box(".data-lens"), fields: box(".field-changes"), before: box(".payload-diff > div:first-child pre"), after: box(".payload-diff > div:last-child pre") };
   });
   expect(bounds.rail.top).toBeGreaterThanOrEqual(bounds.canvas.top);
   expect(bounds.rail.bottom).toBeLessThanOrEqual(bounds.canvas.bottom);
   expect(bounds.footer.bottom).toBeLessThanOrEqual(bounds.rail.bottom);
   expect(bounds.fields.bottom).toBeLessThanOrEqual(bounds.footer.top);
+  expect(bounds.before.bottom).toBeLessThanOrEqual(bounds.fields.top);
+  expect(bounds.after.bottom).toBeLessThanOrEqual(bounds.fields.top);
   expect(bounds.lens.height).toBeGreaterThan(190);
 });
