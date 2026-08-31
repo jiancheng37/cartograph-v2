@@ -27,6 +27,21 @@ Open [http://localhost:5173](http://localhost:5173) and sign in with Google. The
 
 Sign in, create a workspace, then open **Connect Cartograph**. Generate a revocable token and run the displayed HTTP MCP command for Codex or Claude Code.
 
+For this source checkout, install the Cartograph CLI command once:
+
+```bash
+npm run build -w @cartograph/cli
+npm link -w @cartograph/cli
+```
+
+Then connect without putting the token in an environment file or shell history:
+
+```bash
+cartograph login --url http://localhost:4310/mcp
+```
+
+Paste the one-time token at the hidden prompt. The CLI validates it, stores it in macOS Keychain, and persistently configures Codex. Use `cartograph status` to verify the connection and `cartograph logout` to revoke the local credential and remove the Codex MCP entry.
+
 Then ask the agent:
 
 > Use Cartograph on this repository. Register the repository if needed, search for a relevant saved view, then explain how authentication works and create or extend a compact map with source-file references for its claims.

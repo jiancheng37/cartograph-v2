@@ -8,10 +8,11 @@
   ],
   "scripts": {
     "dev": "./scripts/dev-cloud.sh",
-    "build": "npm run build -w @cartograph/shared && npm run build -w @cartograph/server && npm run build -w @cartograph/web",
+    "build": "npm run build -w @cartograph/shared && npm run build -w @cartograph/cli && npm run build -w @cartograph/server && npm run build -w @cartograph/web",
     "test": "npm run test -w @cartograph/server && npm run test -w @cartograph/web",
     "test:e2e": "playwright test",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "cartograph": "npm run dev -w @cartograph/cli --"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
