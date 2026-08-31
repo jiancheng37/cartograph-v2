@@ -28,4 +28,13 @@ describe("web API client", () => {
     await api.deleteTrace("trace_1");
     expect(fetchMock).toHaveBeenCalledWith("/api/traces/trace_1", expect.objectContaining({ method: "DELETE" }));
   });
+
+  it("loads live MCP status and setup metadata", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ connected: true, state: "connected" }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ projectRoot: "/code/cartograph" }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(api.mcpStatus()).resolves.toMatchObject({ connected: true });
+    await expect(api.setup()).resolves.toEqual({ projectRoot: "/code/cartograph" });
+  });
 });

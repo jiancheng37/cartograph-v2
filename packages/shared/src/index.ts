@@ -116,6 +116,8 @@ export type CreateTraceInput = z.infer<typeof CreateTraceSchema>;
 export type TraceStepInput = z.infer<typeof TraceStepSchema>;
 
 export interface Repository { id: string; name: string; rootPath: string; addedAt: string; }
+export interface McpConnectionStatus { connected: boolean; state: "connected" | "waiting"; connectedAt?: string; lastSeenAt?: string; lastActivityAt?: string; }
+export interface AppSetup { projectRoot: string; }
 export interface KnowledgeSearchResult { id: string; type: "view" | "node"; label: string; detail: string; viewId?: string; nodeId?: string; }
 export interface ViewNode extends ViewNodeInput { id: string; position: { x: number; y: number }; childViewId?: string; }
 export interface ViewEdge extends ViewEdgeInput { id: string; route?: z.infer<typeof EdgeRouteSchema>; }

@@ -12,6 +12,8 @@ async function mockApi(page: Page) {
     const request = route.request(); const url = new URL(request.url()); const method = request.method(); const path = url.pathname;
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (path === "/api/repositories" && method === "GET") return json([repository]);
+    if (path === "/api/mcp/status" && method === "GET") return json({ connected: false, state: "waiting" });
+    if (path === "/api/setup" && method === "GET") return json({ projectRoot: "/code/cartograph" });
     if (path.endsWith("/search")) return json([{ id: "node:view_arch:store", type: "node", label: "Semantic store", detail: "Repository architecture · class", viewId: "view_arch", nodeId: "store" }]);
     if (path === "/api/views" && method === "GET") return json(views.filter(view => !view.archivedAt));
     if (path.endsWith("/traces") && method === "GET") return json([]);
@@ -48,6 +50,11 @@ test("searches, focuses evidence, arranges, and manages views", async ({ page },
   await expect(page.getByRole("heading", { name: "Platform map copy" })).toBeVisible();
   await page.getByRole("button", { name: "View actions" }).click(); await page.getByRole("button", { name: "Archive" }).click();
   await expect(page.getByRole("heading", { name: "Platform map", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: /Connect an agent/ }).click();
+  await expect(page.getByRole("heading", { name: "Connect Cartograph" })).toBeVisible();
+  await expect(page.getByText(/codex mcp add cartograph/)).toBeVisible();
+  await page.getByRole("button", { name: "Close setup" }).click();
 });
 
 test("mobile navigation and inspector use the full workspace without overflow", async ({ page }, testInfo) => {
@@ -60,4 +67,14 @@ test("mobile navigation and inspector use the full workspace without overflow", 
   await expect(page.getByRole("heading", { name: "Semantic store" })).toBeVisible();
   const dimensions = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
   expect(dimensions.scroll).toBe(dimensions.client);
+});
+
+test("copies a repository-aware starter investigation", async ({ page, context }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop");
+  await page.route("**/api/views**", route => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.reload();
+  await page.getByRole("button", { name: /Map the architecture/ }).click();
+  await expect(page.getByText(/Prompt copied/)).toBeVisible();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("Use Cartograph for the repository at /code/cartograph-demo");
+  await context.clearPermissions();
 });

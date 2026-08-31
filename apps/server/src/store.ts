@@ -8,6 +8,7 @@ const parse = <T>(value: unknown): T => JSON.parse(String(value)) as T;
 
 export class Store {
   constructor(private db: CartographDb) {}
+  get database() { return this.db; }
 
   repositories(): Repository[] {
     return (this.db.prepare("SELECT * FROM repositories ORDER BY added_at DESC").all() as Row[]).map(repositoryFromRow);

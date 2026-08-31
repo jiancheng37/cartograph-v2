@@ -1,4 +1,4 @@
-import type { KnowledgeSearchResult, KnowledgeTrace, KnowledgeView, Repository } from "@cartograph/shared";
+import type { AppSetup, KnowledgeSearchResult, KnowledgeTrace, KnowledgeView, McpConnectionStatus, Repository } from "@cartograph/shared";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
@@ -8,6 +8,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 export const api = {
   repositories: () => request<Repository[]>("/api/repositories"),
+  mcpStatus: () => request<McpConnectionStatus>("/api/mcp/status"),
+  setup: () => request<AppSetup>("/api/setup"),
   register: (path: string) => request<Repository>("/api/repositories", { method: "POST", body: JSON.stringify({ path }) }),
   deleteRepository: (id: string) => request<void>(`/api/repositories/${id}`, { method: "DELETE" }),
   views: (repositoryId?: string) => request<KnowledgeView[]>(`/api/views${repositoryId ? `?repositoryId=${encodeURIComponent(repositoryId)}` : ""}`),

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Background, Controls, MarkerType, MiniMap, ReactFlow, useEdgesState, useNodesState, type Edge, type Node, type ReactFlowInstance } from "@xyflow/react";
-import { Archive, ArrowLeft, ArrowRight, Braces, CheckCircle2, ChevronDown, ChevronRight, Clock3, Code2, Copy, ExternalLink, FolderGit2, GitBranch, LayoutTemplate, LoaderCircle, Map, Menu, MoreHorizontal, PanelRightClose, Pause, Pencil, Play, Search, Sparkles, Trash2, Unplug, Workflow, X } from "lucide-react";
-import type { Evidence, KnowledgeSearchResult, KnowledgeTrace, KnowledgeView, Repository, ViewNode } from "@cartograph/shared";
+import { Archive, ArrowLeft, ArrowRight, Braces, Check, CheckCircle2, ChevronDown, ChevronRight, Clock3, Code2, Copy, ExternalLink, FolderGit2, GitBranch, LayoutTemplate, LoaderCircle, Map, Menu, MoreHorizontal, PanelRightClose, Pause, Pencil, Play, Route, Search, Sparkles, Terminal, Trash2, Unplug, Workflow, X } from "lucide-react";
+import type { AppSetup, Evidence, KnowledgeSearchResult, KnowledgeTrace, KnowledgeView, McpConnectionStatus, Repository, ViewNode } from "@cartograph/shared";
 import { api } from "./api";
 import { FlowNode } from "./FlowNode";
 import { layoutGraph, usesDefaultGrid } from "./layout";
@@ -19,6 +19,7 @@ export function App() {
   const [flow, setFlow] = useState<ReactFlowInstance<Node, Edge>>(); const [query, setQuery] = useState(""); const [results, setResults] = useState<KnowledgeSearchResult[]>([]);
   const [dialog, setDialog] = useState<DialogState>(); const [viewMenu, setViewMenu] = useState(false); const [repoMenu, setRepoMenu] = useState(false); const [mobileNav, setMobileNav] = useState(false);
   const [repositoryToDelete, setRepositoryToDelete] = useState<Repository>();
+  const [connection, setConnection] = useState<McpConnectionStatus>({ connected: false, state: "waiting" }); const [setup, setSetup] = useState<AppSetup>(); const [setupOpen, setSetupOpen] = useState(false);
   const [traceToDelete, setTraceToDelete] = useState<KnowledgeTrace>();
   const [traces, setTraces] = useState<KnowledgeTrace[]>([]); const [trace, setTrace] = useState<KnowledgeTrace>(); const [traceStep, setTraceStep] = useState(0); const [playing, setPlaying] = useState(false);
   const viewportByView = useRef(new globalThis.Map<string, ReturnType<ReactFlowInstance<Node, Edge>["getViewport"]>>());
@@ -35,6 +36,10 @@ export function App() {
   }, []);
 
   useEffect(() => { void refreshRepositories(); }, [refreshRepositories]);
+  useEffect(() => {
+    const refresh = () => void api.mcpStatus().then(setConnection).catch(() => setConnection({ connected: false, state: "waiting" }));
+    refresh(); void api.setup().then(setSetup).catch(() => undefined); const timer = window.setInterval(refresh, 5_000); return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => { if (!repo) return; void refreshViews(repo).catch(e => setError(message(e))); }, [repo, refreshViews]);
   useEffect(() => {
     if (!view) { setNodes([]); setEdges([]); return; }
@@ -144,7 +149,7 @@ export function App() {
       <div className="nav-label"><span>Agent-created views</span></div>
       <nav className="view-list">{views.filter(item => !item.parentViewId).map(item => <button className={item.id === view?.id || Boolean(view?.ancestors.some(ancestor => ancestor.viewId === item.id)) ? "active" : ""} onClick={() => selectView(item)} key={item.id}><GitBranch size={14} /><span>{item.title}<small>{item.nodes.length} entities · v{item.revision}</small></span></button>)}</nav>
       {!views.length && <div className="empty-nav"><Unplug size={18} /><p>No views yet.</p><small>Ask your connected agent to map a feature.</small></div>}
-      <div className="connection"><span className="live-dot" /><span><b>MCP ready</b><small>Watching for agent updates</small></span></div>
+      <button className={`connection ${connection.connected ? "connected" : ""}`} onClick={() => setSetupOpen(true)}><span className="live-dot" /><span><b>{connection.connected ? "Agent connected" : "Connect an agent"}</b><small>{connection.connected ? `Active ${connection.lastActivityAt ? relativeTime(connection.lastActivityAt) : "now"}` : "Set up Codex or Claude Code"}</small></span><ChevronRight size={12}/></button>
     </aside>
     <section className="workspace">
       <header className="topbar">
@@ -156,7 +161,7 @@ export function App() {
       <div className="canvas-wrap">
         {view ? <ReactFlow nodes={nodes} edges={edges} onInit={setFlow} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeDragStop={(event, node) => void savePosition(event, node)} onNodeClick={(_, node) => setSelected(node.data.item as ViewNode)} onNodeDoubleClick={(_, node) => void drillInto(node.data.item as ViewNode)} onPaneClick={() => setSelected(undefined)} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{ padding: .2 }} minZoom={.3} maxZoom={1.8}>
           <Background color="#252925" gap={24} size={1} /><Controls position="bottom-left" showInteractive={false} /><MiniMap position="bottom-right" pannable zoomable nodeColor="#d2ff52" maskColor="rgba(13,15,14,.72)" />
-        </ReactFlow> : <AgentStart />}
+        </ReactFlow> : <AgentStart repository={repo!} connected={connection.connected} openSetup={() => setSetupOpen(true)} />}
         {view && !trace && <div className="legend"><span><i className="source_cited" />Source cited</span><span><i className="inferred" />Inferred</span><span><i className="user_confirmed" />User confirmed</span></div>}
         {trace && <TraceRail trace={trace} index={traceStep} playing={playing} close={() => { setTrace(undefined); setPlaying(false); }} remove={() => { setPlaying(false); setTraceToDelete(trace); }} select={setTraceStep} toggle={() => setPlaying(value => !value)} />}
       </div>
@@ -165,6 +170,7 @@ export function App() {
     {dialog && repo && <ViewDialog state={dialog} close={() => setDialog(undefined)} complete={async next => { setDialog(undefined); await refreshViews(repo, next?.id); }} />}
     {repositoryToDelete && <RepositoryDeleteDialog repository={repositoryToDelete} close={() => setRepositoryToDelete(undefined)} complete={async () => { setRepositoryToDelete(undefined); setView(undefined); setSelected(undefined); setViews([]); await refreshRepositories(); }} />}
     {traceToDelete && <TraceDeleteDialog trace={traceToDelete} close={() => setTraceToDelete(undefined)} complete={() => { const deletedId = traceToDelete.id; setTraceToDelete(undefined); setTraces(current => current.filter(item => item.id !== deletedId)); setTrace(current => current?.id === deletedId ? undefined : current); setTraceStep(0); setPlaying(false); }} />}
+    {setupOpen && setup && <SetupDrawer setup={setup} connected={connection.connected} close={() => setSetupOpen(false)} />}
     {error && <div className="toast"><span>{error}</span><button onClick={() => setError("")}><X size={14}/></button></div>}
   </main>;
 }
@@ -248,9 +254,31 @@ function repositoryPathFromDrop(data: DataTransfer): string | undefined {
   if (!uri) return undefined;
   try { return decodeURIComponent(new URL(uri).pathname); } catch { return undefined; }
 }
-function AgentStart() {
-  return <div className="agent-start"><div className="empty-orbit"><Sparkles size={24}/></div><span>Workspace ready</span><h2>Ask your agent to map the code.</h2><p>Cartograph will keep the diagrams, source references, drill-downs, and traces your connected coding agent creates.</p><code>“Map the system architecture and cite the source files behind each component.”</code><footer><small>MCP is ready for agent updates</small></footer></div>;
+const starters = [
+  { id: "architecture", icon: Map, title: "Map the architecture", detail: "Major systems, boundaries, and dependencies", task: "Map the repository architecture. Create a compact top-level Cartograph view of the major systems, boundaries, and dependencies. Cite repository-relative source files for each component and relationship when available." },
+  { id: "feature", icon: Code2, title: "Explain a feature", detail: "Find the code behind a capability", task: "Explain a feature in this repository. Ask me which feature to investigate, trace it through the relevant code, then create or extend a focused Cartograph view with concise source references." },
+  { id: "request", icon: Route, title: "Trace a request", detail: "Follow data through the runtime path", task: "Trace an important request or event through this repository. Ask me which entry point to use, create or reuse a Cartograph view, then save a step-by-step trace with runtime boundaries and source references." },
+];
+
+function AgentStart({ repository, connected, openSetup }: { repository: Repository; connected: boolean; openSetup: () => void }) {
+  const [copied, setCopied] = useState<string>();
+  async function copyStarter(id: string, task: string) {
+    const prompt = `Use Cartograph for the repository at ${repository.rootPath}. Register it if needed, search for relevant existing views first, and reuse prior knowledge where possible. ${task}`;
+    await navigator.clipboard.writeText(prompt); setCopied(id); window.setTimeout(() => setCopied(current => current === id ? undefined : current), 1800);
+  }
+  return <div className="agent-start"><div className="agent-start-heading"><div className="empty-orbit"><Sparkles size={22}/></div><div><span>{connected ? "Agent connected" : "Workspace ready"}</span><h2>Start an investigation</h2><p>{connected ? "Copy a prompt into your agent. New maps will appear here automatically." : "Connect an agent, then use a focused prompt to create the first map."}</p></div></div><div className="starter-list">{starters.map(item => { const Icon = item.icon; return <button key={item.id} onClick={() => void copyStarter(item.id, item.task)}><Icon size={16}/><span><b>{item.title}</b><small>{item.detail}</small></span>{copied === item.id ? <Check className="starter-check" size={15}/> : <Copy size={13}/>}</button>; })}</div><footer>{!connected && <button onClick={openSetup}><Terminal size={14}/>Connect Codex or Claude Code</button>}<small>{copied ? "Prompt copied — paste it into your agent" : connected ? "Waiting for a Cartograph tool call" : "Repository source is read by your agent, not Cartograph"}</small></footer></div>;
 }
+
+function SetupDrawer({ setup, connected, close }: { setup: AppSetup; connected: boolean; close: () => void }) {
+  const [client, setClient] = useState<"codex" | "claude">("codex"); const [copied, setCopied] = useState(false);
+  const command = `codex mcp add cartograph -- npm --prefix ${shellQuote(setup.projectRoot)} run start:mcp`;
+  const config = JSON.stringify({ mcpServers: { cartograph: { command: "npm", args: ["--prefix", setup.projectRoot, "run", "start:mcp"] } } }, null, 2);
+  const value = client === "codex" ? command : config;
+  async function copy() { await navigator.clipboard.writeText(value); setCopied(true); window.setTimeout(() => setCopied(false), 1800); }
+  return <><button className="drawer-backdrop" aria-label="Close agent setup" onClick={close}/><aside className="setup-drawer" aria-label="Agent setup"><header><div><small>Agent connection</small><h2>Connect Cartograph</h2></div><button aria-label="Close setup" onClick={close}><X size={16}/></button></header><div className={`connection-state ${connected ? "connected" : ""}`}><i/><span><b>{connected ? "Connected" : "Waiting for an agent"}</b><small>{connected ? "Cartograph is receiving an MCP heartbeat." : "Complete setup, then return here to confirm the connection."}</small></span></div><nav aria-label="Agent client"><button className={client === "codex" ? "active" : ""} onClick={() => { setClient("codex"); setCopied(false); }}>Codex</button><button className={client === "claude" ? "active" : ""} onClick={() => { setClient("claude"); setCopied(false); }}>Claude Code</button></nav><section><span>01</span><div><h3>{client === "codex" ? "Run this command" : "Add this MCP server"}</h3><p>{client === "codex" ? "Run it once in Terminal. Codex stores the server in its MCP configuration." : "Paste this JSON into your Claude Code MCP configuration, then restart the client."}</p><pre><code>{value}</code><button aria-label="Copy setup" onClick={() => void copy()}>{copied ? <Check size={14}/> : <Copy size={14}/>} {copied ? "Copied" : "Copy"}</button></pre></div></section><section><span>02</span><div><h3>Start a fresh agent session</h3><p>Open the repository in your agent and ask it to use Cartograph. The connection status above updates within five seconds.</p></div></section><section><span>03</span><div><h3>Create the first map</h3><p>Close this panel and copy one of the starter investigations from the workspace.</p></div></section></aside></>;
+}
+
+function shellQuote(value: string) { return `'${value.replaceAll("'", `'\\''`)}'`; }
 
 function Inspector({ item, close, repository }: { item: ViewNode; close: () => void; repository: Repository }) {
   const [editor, setEditor] = useState<EditorPreference>(editorPreference());

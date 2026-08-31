@@ -33,6 +33,12 @@ describe("Cartograph knowledge lifecycle", () => {
     await request(app).post("/api/repositories").send({ path: join(root, "missing") }).expect(400);
   });
 
+  it("reports setup metadata and waits for a real MCP heartbeat", async () => {
+    const { app } = workspace("presence");
+    expect((await request(app).get("/api/mcp/status").expect(200)).body).toEqual({ connected: false, state: "waiting" });
+    expect((await request(app).get("/api/setup").expect(200)).body).toEqual({ projectRoot: process.cwd() });
+  });
+
   it("creates, extends, searches, and manages agent-authored views", async () => {
     const { root, app } = workspace("views"); const repository = await register(app, root);
     const created = (await request(app).post("/api/views").send({ repositoryId: repository.id, title: "Authentication flow", description: "Sign-in path", nodes: [{ id: "auth", label: "Authenticate", kind: "function", summary: "Validates a user", confidence: "source_cited", evidence: [{ path: "src/auth.ts", startLine: 1 }] }], edges: [] }).expect(201)).body;

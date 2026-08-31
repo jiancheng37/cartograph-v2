@@ -35,6 +35,10 @@ export function openDatabase(path = process.env.CARTOGRAPH_DB ?? resolve(".carto
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_traces_view ON traces(view_id, updated_at DESC);
+    CREATE TABLE IF NOT EXISTS mcp_presence (
+      id INTEGER PRIMARY KEY CHECK(id=1), connected INTEGER NOT NULL DEFAULT 0,
+      connected_at TEXT, heartbeat_at TEXT, last_activity_at TEXT
+    );
   `);
   ensureRepositoryAddedAtColumn(db);
   ensureViewArchiveColumn(db);

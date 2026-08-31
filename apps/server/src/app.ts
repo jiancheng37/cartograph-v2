@@ -6,12 +6,15 @@ import { CreateTraceSchema, CreateViewSchema, UpdateViewSchema, ViewEdgeInputSch
 import { openDatabase } from "./db.js";
 import { Store } from "./store.js";
 import { registerRepository } from "./repository.js";
+import { mcpStatus } from "./presence.js";
 
 export function createApp(databasePath?: string) {
   const app = express(); const store = new Store(openDatabase(databasePath));
   app.use(cors({ origin: process.env.CARTOGRAPH_WEB_ORIGIN ?? "http://localhost:5173" }));
   app.use(express.json({ limit: "2mb" }));
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
+  app.get("/api/mcp/status", (_req, res) => res.json(mcpStatus(store.database)));
+  app.get("/api/setup", (_req, res) => res.json({ projectRoot: process.cwd() }));
   app.get("/api/repositories", (_req, res) => res.json(store.repositories()));
   app.post("/api/repositories", (req, res, next) => {
     try { const { path } = z.object({ path: z.string().min(1).refine(isAbsolute, "Repository path must be absolute") }).parse(req.body); res.status(201).json(registerRepository(store, path)); } catch (error) { next(error); }
