@@ -9,7 +9,7 @@ export function openDatabase(path = process.env.CARTOGRAPH_DB ?? resolve(".carto
   db.exec(`
     CREATE TABLE IF NOT EXISTS repositories (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, root_path TEXT NOT NULL UNIQUE,
-      added_at TEXT NOT NULL
+      added_at TEXT NOT NULL, owner_id TEXT NOT NULL DEFAULT 'local-user'
     );
     CREATE TABLE IF NOT EXISTS views (
       id TEXT PRIMARY KEY, repository_id TEXT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
@@ -39,14 +39,25 @@ export function openDatabase(path = process.env.CARTOGRAPH_DB ?? resolve(".carto
       id INTEGER PRIMARY KEY CHECK(id=1), connected INTEGER NOT NULL DEFAULT 0,
       connected_at TEXT, heartbeat_at TEXT, last_activity_at TEXT
     );
+    CREATE TABLE IF NOT EXISTS mcp_tokens (
+      id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, last_used_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_mcp_tokens_owner ON mcp_tokens(owner_id,created_at DESC);
   `);
   ensureRepositoryAddedAtColumn(db);
+  ensureRepositoryOwnerColumn(db);
   ensureViewArchiveColumn(db);
   ensureViewHierarchyColumns(db);
   ensureEdgeRouteColumn(db);
   migrateViewGraphKeys(db);
   removeLegacyIndexData(db);
   return db;
+}
+
+function ensureRepositoryOwnerColumn(db: DatabaseSync) {
+  const columns = db.prepare("PRAGMA table_info(repositories)").all() as unknown as TableColumn[];
+  if (!columns.some(column => column.name === "owner_id")) db.exec("ALTER TABLE repositories ADD COLUMN owner_id TEXT NOT NULL DEFAULT 'local-user'");
 }
 
 function removeLegacyIndexData(db: DatabaseSync) {

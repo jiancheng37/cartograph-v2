@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import type { CartographDb } from "./db.js";
-import type { CreateTraceInput, CreateViewInput, Evidence, KnowledgeSearchResult, KnowledgeTrace, KnowledgeView, Repository, TraceStep, ViewEdgeInput, ViewNodeInput } from "@cartograph/shared";
+import type { CreateTraceInput, CreateViewInput, Evidence, KnowledgeSearchResult, KnowledgeTrace, KnowledgeView, McpToken, Repository, TraceStep, ViewEdgeInput, ViewNodeInput } from "@cartograph/shared";
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -10,26 +10,32 @@ export class Store {
   constructor(private db: CartographDb) {}
   get database() { return this.db; }
 
-  repositories(): Repository[] {
-    return (this.db.prepare("SELECT * FROM repositories ORDER BY added_at DESC").all() as Row[]).map(repositoryFromRow);
+  repositories(ownerId?: string): Repository[] {
+    const rows = ownerId ? this.db.prepare("SELECT * FROM repositories WHERE owner_id=? ORDER BY added_at DESC").all(ownerId) : this.db.prepare("SELECT * FROM repositories ORDER BY added_at DESC").all();
+    return (rows as Row[]).map(repositoryFromRow);
   }
 
-  repository(id: string): Repository | null {
-    const row = this.db.prepare("SELECT * FROM repositories WHERE id = ?").get(id) as Row | undefined;
+  repository(id: string, ownerId?: string): Repository | null {
+    const row = (ownerId ? this.db.prepare("SELECT * FROM repositories WHERE id=? AND owner_id=?").get(id, ownerId) : this.db.prepare("SELECT * FROM repositories WHERE id=?").get(id)) as Row | undefined;
     return row ? repositoryFromRow(row) : null;
   }
 
-  deleteRepository(id: string): boolean {
-    return this.db.prepare("DELETE FROM repositories WHERE id=?").run(id).changes > 0;
+  deleteRepository(id: string, ownerId?: string): boolean {
+    return (ownerId ? this.db.prepare("DELETE FROM repositories WHERE id=? AND owner_id=?").run(id, ownerId) : this.db.prepare("DELETE FROM repositories WHERE id=?").run(id)).changes > 0;
   }
 
-  upsertRepository(input: Repository) {
+  upsertRepository(input: Repository, ownerId = "local-user") {
     const legacy = (this.db.prepare("PRAGMA table_info(repositories)").all() as unknown as { name: string }[]).some(column => column.name === "indexed_at");
-    if (legacy) this.db.prepare(`INSERT INTO repositories(id,name,root_path,added_at,indexed_at,file_count,symbol_count) VALUES(?,?,?,?,?,0,0)
-      ON CONFLICT(id) DO UPDATE SET name=excluded.name,root_path=excluded.root_path`).run(input.id, input.name, input.rootPath, input.addedAt, input.addedAt);
-    else this.db.prepare(`INSERT INTO repositories(id,name,root_path,added_at) VALUES(?,?,?,?)
-      ON CONFLICT(id) DO UPDATE SET name=excluded.name,root_path=excluded.root_path`).run(input.id, input.name, input.rootPath, input.addedAt);
+    if (legacy) this.db.prepare(`INSERT INTO repositories(id,name,root_path,added_at,owner_id,indexed_at,file_count,symbol_count) VALUES(?,?,?,?,?,?,0,0)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,root_path=excluded.root_path`).run(input.id, input.name, input.rootPath ?? "", input.addedAt, ownerId, input.addedAt);
+    else this.db.prepare(`INSERT INTO repositories(id,name,root_path,added_at,owner_id) VALUES(?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,root_path=excluded.root_path`).run(input.id, input.name, input.rootPath ?? "", input.addedAt, ownerId);
   }
+
+  mcpTokens(ownerId: string): McpToken[] { return (this.db.prepare("SELECT * FROM mcp_tokens WHERE owner_id=? ORDER BY created_at DESC").all(ownerId) as Row[]).map(tokenFromRow); }
+  createMcpToken(ownerId: string, input: { id: string; name: string; prefix: string; tokenHash: string }): McpToken { const timestamp = now(); this.db.prepare("INSERT INTO mcp_tokens(id,owner_id,name,prefix,token_hash,created_at) VALUES(?,?,?,?,?,?)").run(input.id, ownerId, input.name, input.prefix, input.tokenHash, timestamp); return this.mcpTokens(ownerId).find(token => token.id === input.id)!; }
+  deleteMcpToken(ownerId: string, id: string): boolean { return this.db.prepare("DELETE FROM mcp_tokens WHERE id=? AND owner_id=?").run(id, ownerId).changes > 0; }
+  resolveMcpToken(tokenHash: string): { userId: string; tokenId: string } | undefined { const row = this.db.prepare("SELECT id,owner_id FROM mcp_tokens WHERE token_hash=?").get(tokenHash) as Row | undefined; if (!row) return undefined; this.db.prepare("UPDATE mcp_tokens SET last_used_at=? WHERE id=?").run(now(), String(row.id)); return { userId: String(row.owner_id), tokenId: String(row.id) }; }
 
   views(repositoryId?: string, includeArchived = false): KnowledgeView[] {
     const rows = (repositoryId
@@ -204,6 +210,7 @@ function normalizeConfidence(value: string): KnowledgeView["nodes"][number]["con
 function traceFromRow(row: Row): KnowledgeTrace {
   return { id: String(row.id), viewId: String(row.view_id), title: String(row.title), description: String(row.description), createdAt: String(row.created_at), updatedAt: String(row.updated_at), steps: parse<TraceStep[]>(row.steps_json) };
 }
+function tokenFromRow(row: Row): McpToken { return { id: String(row.id), name: String(row.name), prefix: String(row.prefix), createdAt: String(row.created_at), lastUsedAt: row.last_used_at ? String(row.last_used_at) : undefined }; }
 
 const secretField = /(^|[_-])(password|passwd|secret|token|api[_-]?key|authorization|cookie|private[_-]?key)($|[_-])/i;
 function redactSecrets<T>(value: T): T {

@@ -78,3 +78,11 @@ test("copies a repository-aware starter investigation", async ({ page, context }
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("Use Cartograph for the repository at /code/cartograph-demo");
   await context.clearPermissions();
 });
+
+test("presents the public product and routes into the app", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop");
+  await page.goto("/public");
+  await expect(page.getByRole("heading", { name: "Stop explaining your codebase from scratch." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cartograph stores understanding, not your repository." })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Start with Google/ })).toHaveAttribute("href", /\/app$/);
+});

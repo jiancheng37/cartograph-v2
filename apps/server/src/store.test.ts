@@ -36,7 +36,20 @@ describe("Cartograph knowledge lifecycle", () => {
   it("reports setup metadata and waits for a real MCP heartbeat", async () => {
     const { app } = workspace("presence");
     expect((await request(app).get("/api/mcp/status").expect(200)).body).toEqual({ connected: false, state: "waiting" });
-    expect((await request(app).get("/api/setup").expect(200)).body).toEqual({ projectRoot: process.cwd() });
+    expect((await request(app).get("/api/setup").expect(200)).body).toEqual({ projectRoot: process.cwd(), mcpUrl: "http://localhost:4310/mcp", hosted: false });
+  });
+
+  it("creates revocable MCP credentials and rejects invalid remote access", async () => {
+    const { app } = workspace("mcp-token");
+    const created = (await request(app).post("/api/mcp/tokens").send({ name: "Codex laptop" }).expect(201)).body;
+    expect(created).toMatchObject({ name: "Codex laptop", prefix: expect.stringMatching(/^ctg_/), secret: expect.stringMatching(/^ctg_/) });
+    expect(created.secret).not.toBe(created.prefix);
+    expect((await request(app).get("/api/mcp/tokens").expect(200)).body[0]).not.toHaveProperty("secret");
+    await request(app).post("/mcp").set("Authorization", "Bearer wrong").send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } }).expect(401);
+    const initialized = await request(app).post("/mcp").set("Authorization", `Bearer ${created.secret}`).set("Accept", "application/json, text/event-stream").send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } }).expect(200);
+    expect(initialized.text).toContain("cartograph");
+    await request(app).delete(`/api/mcp/tokens/${created.id}`).expect(204);
+    await request(app).post("/mcp").set("Authorization", `Bearer ${created.secret}`).send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } }).expect(401);
   });
 
   it("creates, extends, searches, and manages agent-authored views", async () => {

@@ -4,12 +4,13 @@ Cartograph turns investigations from Codex, Claude Code, and other MCP clients i
 
 ## What is implemented
 
-- Lightweight repository registration: Cartograph stores a local project root without scanning or parsing its contents.
+- Lightweight repository registration: hosted Cartograph stores a logical repository identity, never repository contents.
 - Semantic views containing components, execution steps, typed relationships, confidence levels, and agent-supplied source references.
 - Optimistic revision control so two agents cannot silently overwrite the same view.
 - MCP tools for discovering prior knowledge, creating views, extending views, drill-downs, and traces.
 - Interactive React Flow canvas with progressive disclosure, source inspection, confidence styling, and live view refresh.
-- Local SQLite persistence and an HTTP API with runtime validation.
+- Google authentication, tenant-scoped PostgreSQL persistence, revocable MCP credentials, and a remote Streamable HTTP MCP endpoint.
+- Local SQLite and stdio MCP remain available for development.
 
 ## Run locally
 
@@ -21,6 +22,8 @@ npm run dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173), enter an absolute repository path, and add it as a workspace. Cartograph does not scan the repository. Local data is stored in `.cartograph/cartograph.db`.
+
+The development server intentionally permits a local user when Supabase variables are absent. Production refuses to start without its required cloud configuration. Copy [`.env.example`](.env.example) for the complete variable list.
 
 ## Connect an MCP client
 
@@ -54,13 +57,15 @@ The MCP server exposes:
 - `create_trace`
 - `list_traces`
 
+In hosted mode, sign in at the app, open **Connect Cartograph**, and generate a revocable token. The app displays the exact remote MCP command. The token is shown once; Cartograph stores only its SHA-256 hash.
+
 ## Architecture
 
 ```text
-Coding agent ──MCP──▶ visual knowledge service ──SQLite
-       │                       ▲                    │
-       └── reads code ─────────┘                    ▼
-                                           interactive canvas
+Codex / Claude Code ── authenticated remote MCP ──▶ API ──▶ PostgreSQL
+        │                                             ▲          │
+        └── reads local source and sends maps ────────┘          ▼
+                                                       app.cartograph.com
 ```
 
 Agents remain responsible for reading and interpreting source code. Cartograph persists their maps, traces, confidence labels, and repository-relative source references.
@@ -75,6 +80,10 @@ npm run test:e2e  # browser tests
 npm run typecheck # strict TypeScript checks
 ```
 
-## Current product boundary
+## Deploy
 
-This release is local-first and single-user. It does not parse repositories, maintain symbol databases, infer dependency graphs, or calculate change impact. Those investigations belong to the connected coding agent; Cartograph stores the resulting visual knowledge.
+Follow [`DEPLOYMENT.md`](DEPLOYMENT.md) for Supabase Google OAuth, PostgreSQL migration, API container, DNS surfaces, and a production smoke test.
+
+## Product boundary
+
+Cartograph does not parse, upload, or index repositories. It also does not infer dependency graphs or calculate change impact by itself. Those investigations belong to the connected coding agent; Cartograph stores the resulting visual knowledge under the authenticated user's account.

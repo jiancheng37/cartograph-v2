@@ -1,0 +1,7 @@
+node_modules
+**/dist
+.git
+.cartograph
+*.log
+test-results
+playwright-report
