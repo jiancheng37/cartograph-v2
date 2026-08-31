@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import type { CartographDb } from "./db.js";
 import type { CreateTraceInput, CreateViewInput, Evidence, KnowledgeSearchResult, KnowledgeTrace, KnowledgeView, McpToken, Repository, TraceStep, ViewEdgeInput, ViewNodeInput } from "@cartograph/shared";
+import { validateTrace } from "./trace-validation.js";
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -136,13 +137,7 @@ export class Store {
 
   createTrace(input: CreateTraceInput): KnowledgeTrace {
     const view = this.view(input.viewId); if (!view) throw new Error("View not found");
-    const nodeIds = new Set(view.nodes.map(node => node.id)); const edgeIds = new Set(view.edges.map(edge => edge.id));
-    for (const [index, step] of input.steps.entries()) {
-      if (!nodeIds.has(step.nodeId)) throw new Error(`Trace step ${index + 1} references a node outside this view`);
-      if (step.edgeId && !edgeIds.has(step.edgeId)) throw new Error(`Trace step ${index + 1} references an edge outside this view`);
-      if (step.receives?.nodeId && !nodeIds.has(step.receives.nodeId)) throw new Error(`Trace step ${index + 1} receives from a node outside this view`);
-      if (step.produces?.nodeId && !nodeIds.has(step.produces.nodeId)) throw new Error(`Trace step ${index + 1} produces to a node outside this view`);
-    }
+    validateTrace(view, input);
     const id = nanoid(12); const timestamp = now();
     const steps: TraceStep[] = input.steps.map((step, index) => ({
       ...step,

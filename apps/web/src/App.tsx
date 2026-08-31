@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Background, Controls, MarkerType, MiniMap, ReactFlow, useEdgesState, useNodesState, type Edge, type Node, type ReactFlowInstance } from "@xyflow/react";
 import { Archive, ArrowLeft, ArrowRight, Braces, Check, CheckCircle2, ChevronDown, ChevronRight, Clock3, Code2, Copy, ExternalLink, FolderGit2, GitBranch, LayoutTemplate, LoaderCircle, LogOut, Map, Menu, MoreHorizontal, PanelRightClose, Pause, Pencil, Play, Route, Search, Sparkles, Terminal, Trash2, Unplug, Workflow, X } from "lucide-react";
-import type { AppSetup, Evidence, KnowledgeSearchResult, KnowledgeTrace, KnowledgeView, McpConnectionStatus, Repository, ViewNode } from "@cartograph/shared";
+import { payloadFieldConsistencyError, type AppSetup, type Evidence, type KnowledgeSearchResult, type KnowledgeTrace, type KnowledgeView, type McpConnectionStatus, type Repository, type ViewNode } from "@cartograph/shared";
 import { api } from "./api";
 import { FlowNode } from "./FlowNode";
 import { layoutGraph, usesDefaultGrid } from "./layout";
@@ -204,8 +204,11 @@ function Boundary({ direction, boundary }: { direction: "receives" | "produces";
 }
 
 function DataLens({ payload }: { payload: NonNullable<KnowledgeTrace["steps"][number]["payload"]> }) {
-  const [selected, setSelected] = useState(0); const fields = payload.fields.filter(item => String(item.operation) !== "passed_through"); const field = fields[selected];
-  return <div className="data-lens"><header><span><Braces size={12}/>Data lens</span><i>{payload.format}</i></header><div className="payload-diff"><div><small>Before</small><pre>{formatPayload(payload.before)}</pre></div><ArrowRight size={14}/><div><small>After</small><pre>{formatPayload(payload.after)}</pre></div></div>{fields.length > 0 && <div className="field-changes"><nav aria-label="Payload field changes">{fields.map((item, itemIndex) => <button className={`${item.operation} ${itemIndex === selected ? "active" : ""}`} key={`${item.path}-${itemIndex}`} onClick={() => setSelected(itemIndex)}><i>{operationMark(item.operation)}</i><span>{item.path}</span><small>{item.operation.replace("_", " ")}</small></button>)}</nav>{field && <aside><b>{field.path}</b><p>{field.explanation}</p>{(field.before !== undefined || field.after !== undefined) && <code>{formatInline(field.before)} <ArrowRight size={10}/> {formatInline(field.after)}</code>}{field.evidence[0] && <em>{field.evidence[0].path}{field.evidence[0].startLine ? `:${field.evidence[0].startLine}` : ""}</em>}</aside>}</div>}</div>;
+  const [selected, setSelected] = useState(0);
+  const consistency = payload.fields.map(item => payloadFieldConsistencyError(payload, item));
+  const fields = payload.fields.filter((item, index) => String(item.operation) !== "passed_through" && !consistency[index]);
+  const hiddenCount = payload.fields.length - fields.length; const field = fields[selected] ?? fields[0];
+  return <div className="data-lens"><header><span><Braces size={12}/>Data lens</span><div>{hiddenCount > 0 && <strong title="The modifier did not match the before/after payload">{hiddenCount} inconsistent modifier{hiddenCount === 1 ? "" : "s"} hidden</strong>}<i>{payload.format}</i></div></header><div className="payload-diff"><div><small>Before</small><pre>{formatPayload(payload.before)}</pre></div><ArrowRight size={14}/><div><small>After</small><pre>{formatPayload(payload.after)}</pre></div></div>{fields.length > 0 && <div className="field-changes"><nav aria-label="Payload field changes">{fields.map((item, itemIndex) => <button className={`${item.operation} ${itemIndex === selected ? "active" : ""}`} key={`${item.path}-${itemIndex}`} onClick={() => setSelected(itemIndex)}><i>{operationMark(item.operation)}</i><span>{item.path}</span><small>{item.operation.replace("_", " ")}</small></button>)}</nav>{field && <aside><b>{field.path}</b><p>{field.explanation}</p>{(field.before !== undefined || field.after !== undefined) && <code>{formatInline(field.before)} <ArrowRight size={10}/> {formatInline(field.after)}</code>}{field.evidence[0] && <em>{field.evidence[0].path}{field.evidence[0].startLine ? `:${field.evidence[0].startLine}` : ""}</em>}</aside>}</div>}</div>;
 }
 
 export function formatPayload(value: unknown) {

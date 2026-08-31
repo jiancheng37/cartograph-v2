@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { nanoid } from "nanoid";
 import postgres, { type Sql } from "postgres";
 import type { CreateTraceInput, CreateViewInput, Evidence, KnowledgeSearchResult, KnowledgeTrace, KnowledgeView, McpToken, Repository, TraceStep, ViewEdge, ViewEdgeInput, ViewNode, ViewNodeInput } from "@cartograph/shared";
+import { validateTrace } from "./trace-validation.js";
 
 const now = () => new Date().toISOString();
 const repoId = (ownerId: string, externalId: string) => `repo_${createHash("sha256").update(`${ownerId}:${externalId}`).digest("hex").slice(0, 16)}`;
@@ -51,7 +52,6 @@ function traceFromRow(row: Record<string, unknown>): KnowledgeTrace { return { i
 function tokenFromRow(row: Record<string, unknown>): McpToken { return { id: String(row.id), name: String(row.name), prefix: String(row.prefix), createdAt: iso(row.created_at), lastUsedAt: row.last_used_at ? iso(row.last_used_at) : undefined }; }
 function iso(value: unknown) { return value instanceof Date ? value.toISOString() : String(value); }
 function assertRevision(view: KnowledgeView, expected?: number) { if (expected && view.revision !== expected) throw new Error(`Revision conflict: expected ${expected}, found ${view.revision}`); }
-function validateTrace(view: KnowledgeView, input: CreateTraceInput) { const nodes = new Set(view.nodes.map(node => node.id)); const edges = new Set(view.edges.map(edge => edge.id)); input.steps.forEach((step, index) => { if (!nodes.has(step.nodeId) || (step.edgeId && !edges.has(step.edgeId)) || (step.receives?.nodeId && !nodes.has(step.receives.nodeId)) || (step.produces?.nodeId && !nodes.has(step.produces.nodeId))) throw new Error(`Trace step ${index + 1} references an item outside this view`); }); }
 const secretField = /(^|[_-])(password|passwd|secret|token|api[_-]?key|authorization|cookie|private[_-]?key)($|[_-])/i;
 function redact<T>(value: T): T { if (Array.isArray(value)) return value.map(redact) as T; if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, secretField.test(key) ? "[REDACTED]" : redact(item)])) as T; return value; }
 function redactSteps(steps: CreateTraceInput["steps"]): TraceStep[] { return steps.map((step, index) => ({ ...step, id: step.id ?? `step-${index + 1}`, payload: step.payload ? { ...step.payload, before: redact(step.payload.before), after: redact(step.payload.after), fields: step.payload.fields.map(field => ({ ...field, before: redact(field.before), after: redact(field.after) })) } : undefined })); }

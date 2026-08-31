@@ -115,6 +115,57 @@ export type CreateViewInput = z.infer<typeof CreateViewSchema>;
 export type CreateTraceInput = z.infer<typeof CreateTraceSchema>;
 export type TraceStepInput = z.infer<typeof TraceStepSchema>;
 
+type TracePayload = NonNullable<TraceStepInput["payload"]>;
+type TracePayloadField = TracePayload["fields"][number];
+
+export function payloadFieldConsistencyError(payload: TracePayload, field: TracePayloadField): string | undefined {
+  const before = resolveJsonPath(payload.before, field.path);
+  const after = resolveJsonPath(payload.after, field.path);
+  const mismatch = (side: "before" | "after", actual: { exists: boolean; value?: unknown }) => {
+    const declared = field[side];
+    return declared !== undefined && (!actual.exists || !jsonEqual(declared, actual.value))
+      ? `${side} value does not match payload.${side}`
+      : undefined;
+  };
+
+  if (field.operation === "added" && (before.exists || !after.exists)) return "marked added, but the path must be absent before and present after";
+  if (field.operation === "removed" && (!before.exists || after.exists)) return "marked removed, but the path must be present before and absent after";
+  if (field.operation === "modified" && (!before.exists || !after.exists || jsonEqual(before.value, after.value))) return "marked modified, but the path must exist on both sides with different values";
+  if (field.operation === "read" && !before.exists) return "marked read, but the path does not exist in payload.before";
+  if (field.operation === "persisted" && !after.exists) return "marked persisted, but the path does not exist in payload.after";
+  if (field.operation === "redacted" && !((before.exists && before.value === "[REDACTED]") || (after.exists && after.value === "[REDACTED]"))) return "marked redacted, but neither side contains [REDACTED] at that path";
+  return mismatch("before", before) ?? mismatch("after", after);
+}
+
+export function tracePayloadConsistencyErrors(steps: TraceStepInput[]): string[] {
+  return steps.flatMap((step, stepIndex) => step.payload?.fields.flatMap((field, fieldIndex) => {
+    const error = payloadFieldConsistencyError(step.payload!, field);
+    return error ? [`Trace step ${stepIndex + 1}, field ${fieldIndex + 1} (${JSON.stringify(field.path)}): ${error}. Use a real payload path, remove the modifier, or describe an external output with produces.`] : [];
+  }) ?? []);
+}
+
+function resolveJsonPath(root: unknown, path: string): { exists: boolean; value?: unknown } {
+  const normalized = path.trim().replace(/^\$\.?/, "");
+  if (!normalized) return { exists: true, value: root };
+  const segments = normalized.replace(/\[(?:"([^"]+)"|'([^']+)'|(\d+))\]/g, (_match, double, single, index) => `.${double ?? single ?? index}`).split(".").filter(Boolean);
+  let current = root;
+  for (const segment of segments) {
+    if (current === null || typeof current !== "object" || !Object.prototype.hasOwnProperty.call(current, segment)) return { exists: false };
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return { exists: true, value: current };
+}
+
+function jsonEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) && Array.isArray(right)) return left.length === right.length && left.every((value, index) => jsonEqual(value, right[index]));
+  if (left && right && typeof left === "object" && typeof right === "object" && !Array.isArray(left) && !Array.isArray(right)) {
+    const leftKeys = Object.keys(left as object).sort(); const rightKeys = Object.keys(right as object).sort();
+    return leftKeys.length === rightKeys.length && leftKeys.every((key, index) => key === rightKeys[index] && jsonEqual((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]));
+  }
+  return false;
+}
+
 export interface Repository { id: string; name: string; rootPath?: string; externalId?: string; addedAt: string; }
 export interface McpToken { id: string; name: string; prefix: string; createdAt: string; lastUsedAt?: string; }
 export interface McpConnectionStatus { connected: boolean; state: "connected" | "waiting"; connectedAt?: string; lastSeenAt?: string; lastActivityAt?: string; }

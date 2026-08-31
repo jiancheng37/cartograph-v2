@@ -1959,6 +1959,18 @@ input {
   text-transform: uppercase;
   font-style: normal;
 }
+.data-lens > header > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.data-lens > header strong {
+  color: #b9a35f;
+  font: 7px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
 .payload-diff {
   display: grid;
   grid-template-columns: 1fr 16px 1fr;

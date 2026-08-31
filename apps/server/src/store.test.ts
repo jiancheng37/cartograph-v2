@@ -85,6 +85,18 @@ describe("Cartograph knowledge lifecycle", () => {
     expect((await request(app).get(`/api/views/${view.id}/traces`).expect(200)).body).toHaveLength(1);
   });
 
+  it("rejects payload modifiers that are not supported by the payload diff", async () => {
+    const { root, app } = workspace("trace-consistency"); const repository = await register(app, root);
+    const view = (await request(app).post("/api/views").send({ repositoryId: repository.id, title: "Webhook", nodes: [{ id: "route", label: "Route", kind: "route", summary: "Receives a webhook", evidence: [] }, { id: "worker", label: "Worker", kind: "service", summary: "Processes it", evidence: [] }], edges: [] }).expect(201)).body;
+    const invalid = { title: "Webhook trace", steps: [{ nodeId: "route", label: "Receive", action: "Receive it", payload: { format: "json", before: { name: "Aisha" }, after: { luid: "demo", name: "Aisha" }, fields: [{ path: "HTTP response", operation: "added", explanation: "Returns a response", after: "queued", evidence: [] }] } }, { nodeId: "worker", label: "Process", action: "Process it" }] };
+    const response = await request(app).post(`/api/views/${view.id}/traces`).send(invalid).expect(400);
+    expect(response.body.error).toContain('"HTTP response"');
+    expect(response.body.error).toContain("absent before and present after");
+
+    const valid = structuredClone(invalid); valid.steps[0]!.payload!.fields = [{ path: "luid", operation: "added", explanation: "Adds the correlation ID", after: "demo", evidence: [] }];
+    await request(app).post(`/api/views/${view.id}/traces`).send(valid).expect(201);
+  });
+
   it("rejects concurrent updates and preserves arranged routes", async () => {
     const { root, app } = workspace("revision"); const repository = await register(app, root);
     const view = (await request(app).post("/api/views").send({ repositoryId: repository.id, title: "Map", nodes: [{ id: "a", label: "A", kind: "service", summary: "A", evidence: [] }, { id: "b", label: "B", kind: "service", summary: "B", evidence: [] }], edges: [{ id: "a-b", source: "a", target: "b", kind: "calls", evidence: [] }] }).expect(201)).body;
