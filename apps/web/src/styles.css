@@ -393,38 +393,79 @@ input {
 .react-flow__node.selected .react-flow__handle {
   background: var(--accent);
 }
-.legend {
+.context-legend {
   position: absolute;
   left: 50%;
   bottom: 18px;
   transform: translateX(-50%);
   display: flex;
-  gap: 15px;
+  max-width: calc(100% - 210px);
+  gap: 14px;
   background: #181b18dd;
   border: 1px solid #2b302b;
   border-radius: 7px;
-  padding: 8px 11px;
+  padding: 7px 10px;
   color: #777e78;
-  font-size: 9px;
+  font-size: 8px;
   backdrop-filter: blur(10px);
 }
-.legend span {
+.context-legend section {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
+  min-width: 0;
 }
-.legend i {
+.context-legend section + section {
+  padding-left: 14px;
+  border-left: 1px solid #303430;
+}
+.context-legend section > b {
+  color: #a2a9a3;
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.context-legend span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.context-legend i {
+  display: block;
+  flex: none;
+}
+.legend-node,
+.legend-confidence {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: 2px;
 }
-.source_cited {
+.legend-node.kind-system,
+.legend-node.kind-concept { background: #b8d967; }
+.legend-node.kind-service,
+.legend-node.kind-function { background: #78a6c8; }
+.legend-node.kind-module,
+.legend-node.kind-class { background: #9c89c8; }
+.legend-node.kind-route { background: #63aaa8; }
+.legend-node.kind-database { background: #ad83c5; }
+.legend-node.kind-external { background: #d09a5f; }
+.legend-node.kind-queue { background: #c6809e; }
+.legend-edge {
+  width: 13px;
+  height: 5px;
+  border-top: 1px solid currentColor;
+  border-right: 3px solid currentColor;
+  transform: skewX(28deg);
+}
+.legend-confidence.source_cited {
   background: #aab2ac;
 }
-.inferred {
+.legend-confidence.inferred {
   border: 1px dashed #939a94;
 }
-.user_confirmed {
+.legend-confidence.user_confirmed {
   background: var(--accent);
 }
 .inspector {
@@ -1337,10 +1378,17 @@ input {
   .react-flow__minimap {
     display: none;
   }
-  .legend {
+  .context-legend {
+    left: 12px;
+    right: 12px;
     bottom: 12px;
+    max-width: none;
+    transform: none;
     gap: 9px;
-    white-space: nowrap;
+    overflow-x: auto;
+  }
+  .context-legend section + section {
+    padding-left: 9px;
   }
   .dialog-backdrop {
     padding: 12px;

@@ -164,7 +164,7 @@ export function App({ user }: { user?: { name: string; email: string } }) {
         {view ? <ReactFlow nodes={nodes} edges={edges} onInit={setFlow} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeDragStop={(event, node) => void savePosition(event, node)} onNodeClick={(_, node) => setSelected(node.data.item as ViewNode)} onNodeDoubleClick={(_, node) => void drillInto(node.data.item as ViewNode)} onPaneClick={() => setSelected(undefined)} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{ padding: .2 }} minZoom={.3} maxZoom={1.8}>
           <Background color="#252925" gap={24} size={1} /><Controls position="bottom-left" showInteractive={false} /><MiniMap position="bottom-right" pannable zoomable nodeColor="#d2ff52" maskColor="rgba(13,15,14,.72)" />
         </ReactFlow> : <AgentStart repository={repo!} connected={connection.connected} openSetup={() => setSetupOpen(true)} />}
-        {view && !trace && <div className="legend"><span><i className="source_cited" />Source cited</span><span><i className="inferred" />Inferred</span><span><i className="user_confirmed" />User confirmed</span></div>}
+        {view && !trace && <ContextLegend view={view} />}
         {trace && <TraceRail trace={trace} index={traceStep} playing={playing} close={() => { setTrace(undefined); setPlaying(false); }} remove={() => { setPlaying(false); setTraceToDelete(trace); }} select={setTraceStep} toggle={() => setPlaying(value => !value)} />}
       </div>
     </section>
@@ -179,6 +179,19 @@ export function App({ user }: { user?: { name: string; email: string } }) {
 
 const relationshipColors: Record<KnowledgeView["edges"][number]["kind"], string> = { calls: "#7f9db4", imports: "#778b9c", reads: "#63aaa8", writes: "#a486c4", publishes: "#d09a5f", consumes: "#68a9b6", contains: "#7d8780", depends_on: "#8494ae", transforms: "#bb7fa7", returns: "#7fa46d" };
 function mapEdges(items: KnowledgeView["edges"], activeId?: string, visited?: Set<string>): Edge[] { return items.map(edge => { const active = edge.id === activeId; const seen = visited?.has(edge.id); const semanticColor = relationshipColors[edge.kind]; const color = active ? "#d2ff52" : seen ? semanticColor : visited ? "#343936" : semanticColor; return { id: edge.id, source: edge.source, target: edge.target, label: edge.label ?? edge.kind.replace("_", " "), type: "routed", data: { route: edge.route, color }, className: active ? "trace-edge-active" : seen ? "trace-edge-visited" : visited ? "trace-edge-dim" : undefined, markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color }, style: { stroke: color, strokeWidth: active ? 2.4 : undefined, strokeDasharray: edge.confidence === "inferred" && !active ? "5 5" : undefined } }; }); }
+
+function ContextLegend({ view }: { view: KnowledgeView }) {
+  const nodeKinds = [...new Set(view.nodes.map(node => node.kind))];
+  const edgeKinds = [...new Set(view.edges.map(edge => edge.kind))];
+  const confidences = [...new Set([...view.nodes, ...view.edges].map(item => item.confidence))];
+  return <aside className="context-legend" aria-label="Diagram legend">
+    {nodeKinds.length > 0 && <section><b>Elements</b>{nodeKinds.map(kind => <span key={kind}><i className={`legend-node kind-${kind}`} />{humanize(kind)}</span>)}</section>}
+    {edgeKinds.length > 0 && <section><b>Relationships</b>{edgeKinds.map(kind => <span key={kind}><i className="legend-edge" style={{ color: relationshipColors[kind] }} />{humanize(kind)}</span>)}</section>}
+    {confidences.length > 0 && <section><b>Evidence</b>{confidences.map(confidence => <span key={confidence}><i className={`legend-confidence ${confidence}`} />{humanize(confidence)}</span>)}</section>}
+  </aside>;
+}
+
+function humanize(value: string) { return value.replaceAll("_", " ").replace(/^./, character => character.toUpperCase()); }
 
 function TraceRail({ trace, index, playing, close, remove, select, toggle }: { trace: KnowledgeTrace; index: number; playing: boolean; close: () => void; remove: () => void; select: (index: number) => void; toggle: () => void }) {
   const step = trace.steps[index]!;

@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import type { CartographDb } from "./db.js";
-import { childViewType, viewNodeKindErrors, type CreateTraceInput, type CreateViewInput, type Evidence, type KnowledgeSearchResult, type KnowledgeTrace, type KnowledgeView, type McpToken, type Repository, type TraceStep, type ViewEdgeInput, type ViewNodeInput } from "@cartograph/shared";
+import { childViewType, viewEdgeLabelErrors, viewNodeKindErrors, type CreateTraceInput, type CreateViewInput, type Evidence, type KnowledgeSearchResult, type KnowledgeTrace, type KnowledgeView, type McpToken, type Repository, type TraceStep, type ViewEdgeInput, type ViewNodeInput } from "@cartograph/shared";
 import { validateTrace } from "./trace-validation.js";
 
 type Row = Record<string, unknown>;
@@ -87,7 +87,7 @@ export class Store {
   extendView(id: string, nodes: ViewNodeInput[], edges: ViewEdgeInput[], expectedRevision?: number): KnowledgeView {
     const current = this.view(id); if (!current) throw new Error("View not found");
     if (expectedRevision && current.revision !== expectedRevision) throw new Error(`Revision conflict: expected ${expectedRevision}, found ${current.revision}`);
-    const semanticErrors = viewNodeKindErrors(current.viewType, nodes); if (semanticErrors.length) throw new Error(semanticErrors.join("\n"));
+    const semanticErrors = [...viewNodeKindErrors(current.viewType, nodes), ...viewEdgeLabelErrors(current.viewType, edges)]; if (semanticErrors.length) throw new Error(semanticErrors.join("\n"));
     this.addGraph(id, nodes, edges);
     this.db.prepare("UPDATE views SET updated_at=?,revision=revision+1 WHERE id=?").run(now(), id);
     return this.view(id)!;

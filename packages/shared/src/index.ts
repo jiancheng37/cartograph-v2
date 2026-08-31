@@ -49,8 +49,8 @@ export const CreateViewSchema = z.object({
   edges: z.array(ViewEdgeInputSchema).max(160).default([]),
 }).refine(input => Boolean(input.parentViewId) === Boolean(input.parentNodeId), { message: "parentViewId and parentNodeId must be provided together" })
   .superRefine((input, context) => {
-    const errors = viewNodeKindErrors(input.viewType, input.nodes);
-    for (const error of errors) context.addIssue({ code: "custom", message: error, path: ["nodes"] });
+    for (const error of viewNodeKindErrors(input.viewType, input.nodes)) context.addIssue({ code: "custom", message: error, path: ["nodes"] });
+    for (const error of viewEdgeLabelErrors(input.viewType, input.edges)) context.addIssue({ code: "custom", message: error, path: ["edges"] });
   });
 
 export const PatchViewSchema = z.object({
@@ -134,6 +134,15 @@ const viewNodeKinds: Record<ViewTypeValue, Set<z.infer<typeof NodeKind>>> = {
 export function viewNodeKindErrors(viewType: ViewTypeValue, nodes: Pick<ViewNodeInput, "label" | "kind">[]): string[] {
   const allowed = viewNodeKinds[viewType];
   return nodes.flatMap(node => allowed.has(node.kind) ? [] : [`${JSON.stringify(node.label)} is a ${node.kind}, which does not belong in a ${viewType} view. Allowed kinds: ${[...allowed].join(", ")}`]);
+}
+
+export function viewEdgeLabelErrors(viewType: ViewTypeValue, edges: Pick<ViewEdgeInput, "kind" | "label">[]): string[] {
+  if (viewType === "custom") return [];
+  return edges.flatMap(edge => {
+    const label = edge.label?.trim(); const normalized = label?.toLowerCase().replaceAll("_", " ");
+    const generic = new Set([edge.kind.replaceAll("_", " "), "uses", "use", "calls", "call", "depends on", "dependency"]);
+    return !label || generic.has(normalized!) ? [`A ${edge.kind} relationship in a ${viewType} view needs an intent-rich label, such as "Submits authenticated webhook" rather than ${JSON.stringify(label || edge.kind)}.`] : [];
+  });
 }
 
 export function childViewType(parentType: ViewTypeValue, nodeKind: z.infer<typeof NodeKind>): ViewTypeValue {

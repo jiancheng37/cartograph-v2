@@ -79,7 +79,10 @@ describe("Cartograph knowledge lifecycle", () => {
 
   it("keeps typed views at one abstraction level", async () => {
     const { root, app } = workspace("view-types"); const repository = await register(app, root);
-    const system = (await request(app).post("/api/views").send({ repositoryId: repository.id, title: "CRM runtime", viewType: "system", scope: "CRM product", nodes: [{ id: "api", label: "API service", kind: "service", summary: "Serves requests", evidence: [] }], edges: [] }).expect(201)).body;
+    const nodes = [{ id: "api", label: "API service", kind: "service", summary: "Serves requests", evidence: [] }, { id: "worker", label: "Lead worker", kind: "service", summary: "Processes leads", evidence: [] }];
+    const generic = await request(app).post("/api/views").send({ repositoryId: repository.id, title: "Generic runtime", viewType: "system", scope: "CRM product", nodes, edges: [{ source: "api", target: "worker", kind: "calls", label: "calls", evidence: [] }] }).expect(400);
+    expect(generic.body.error).toContain("intent-rich label");
+    const system = (await request(app).post("/api/views").send({ repositoryId: repository.id, title: "CRM runtime", viewType: "system", scope: "CRM product", nodes, edges: [{ source: "api", target: "worker", kind: "calls", label: "Queues lead for processing", evidence: [] }] }).expect(201)).body;
     expect(system).toMatchObject({ viewType: "system", scope: "CRM product" });
     const invalid = await request(app).post(`/api/views/${system.id}/extend`).send({ nodes: [{ id: "handler", label: "Webhook handler", kind: "function", summary: "Handles a webhook", evidence: [] }], edges: [] }).expect(400);
     expect(invalid.body.error).toContain("does not belong in a system view");
