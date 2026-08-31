@@ -91,7 +91,7 @@ export const TraceStepSchema = z.object({
     after: z.json(),
     fields: z.array(z.object({
       path: z.string().min(1).max(200),
-      operation: z.enum(["added", "modified", "read", "removed", "persisted", "redacted", "passed_through"]),
+      operation: z.enum(["added", "modified", "read", "removed", "persisted", "redacted"]),
       explanation: z.string().min(1).max(500),
       before: z.json().optional(),
       after: z.json().optional(),
