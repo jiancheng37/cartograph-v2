@@ -1,0 +1,21 @@
+{
+  "name": "cartograph",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev -w @cartograph/server\" \"npm run dev -w @cartograph/web\"",
+    "build": "npm run build -w @cartograph/shared && npm run build -w @cartograph/server && npm run build -w @cartograph/web",
+    "test": "npm run test -w @cartograph/server && npm run test -w @cartograph/web",
+    "test:e2e": "playwright test",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "start:mcp": "npm run mcp -w @cartograph/server"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "concurrently": "^9.2.1"
+  }
+}
